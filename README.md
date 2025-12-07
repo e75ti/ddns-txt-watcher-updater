@@ -7,6 +7,7 @@ Watch your public IP and atomically update a single DNS TXT record (e.g. `__ddns
 - Update a single TXT record (create/edit) via Porkbun API (other providers can be added)
 - AES‑GCM encryption for TXT payloads
 - Container-friendly; secrets can be provided via env / gitignored secrets file / docker mount
+- Dockerfile and docker-compose examples available for local/containerized use.
 - WIP Ansible playbook for automated host deployment
 - WIP CI/CD (GitHub Actions) examples available
 
@@ -40,6 +41,18 @@ docker run -d \
   - Add `porkbun_secrets.py` to `.gitignore`.
   - Commit `porkbun_secrets.py.template` (no secrets) as a template.
 
+### Environment variables
+```bash
+docker run -d \
+  --name ddns-txt-updater \
+  -v "$(pwd)/data":/data \
+  -e PORKBUN_APIKEY=pk1_xxx \
+  -e PORKBUN_SECRETAPIKEY=sk1_xxx \
+  -e PORKBUN_DOMAIN=example.com \
+  ddns-txt-updater:latest
+```
+Note: environment variables are convenient but visible to processes/users with host access. Prefer env-file, secrets or separate file in production.
+
 
 ## APIs list
 - Cloudflare: https://github.com/cloudflare/cloudflare-python
@@ -51,7 +64,6 @@ TODO: add more providers (PRs welcome).
 
 ## WIP: Ansible & Docker
 - A WIP Ansible playbook is included to demonstrate automated deploy/pull/run on remote hosts.
-- Dockerfile and docker-compose examples available for local/containerized use.
 - CI/CD: recommended pipeline builds and pushes container to a registry, then uses Ansible (or SSH) to deploy.
 
 ## Security & best practices

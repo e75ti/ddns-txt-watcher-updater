@@ -1,0 +1,89 @@
+- name: Deploy ddns-txt-updater
+  hosts: ddhosts
+  become: yes
+  vars:
+    app_dir: /opt/ddns-txt-updater
+    image_name: ddns-txt-updater:latest
+    container_name: ddnsupdater
+    check_interval: 300
+    last_ip_file: /data/last_ip
+    ip_source: https://api.ipify.org
+    porkbun_apikey: ""
+    porkbun_secretapikey: ""
+    porkbun_domain: ""
+    porkbun_subdomain: "__ddnsinfo"
+  tasks:
+    - name: Ensure required apt packages are present
+      apt:
+        name:
+          - docker.io
+          - python3-pip
+        state: present
+        update_cache: yes
+
+    - name: Ensure docker service is started and enabled
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Create app directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Copy project files to remote (recursively)
+      copy:
+        src: "{{ playbook_dir }}/../"   # copies repo root -> remote app_dir, see if smart
+        dest: "{{ app_dir }}/"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Ensure data dir exists on host
+      file:
+        path: "{{ app_dir }}/data"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Create porkbun_secrets.py from template
+      template:
+        src: porkbun_secrets.py.j2
+        dest: "{{ app_dir }}/porkbun_secrets.py"
+        owner: root
+        group: root
+        mode: "0600"
+      when: porkbun_apikey != "" or porkbun_secretapikey != "" or porkbun_domain != ""
+
+    - name: Build Docker image
+      command: docker build -t "{{ image_name }}" .
+      args:
+        chdir: "{{ app_dir }}"
+      environment:
+        PIP_NO_CACHE_DIR: "1"
+
+    - name: Stop and remove existing container if present
+      shell: |
+        docker rm -f "{{ container_name }}" >/dev/null 2>&1 || true
+
+    - name: Run container
+      shell: |
+        docker run -d --name "{{ container_name }}" \
+          --restart unless-stopped \
+          -v "{{ app_dir }}/data":/data \
+          -v "{{ app_dir }}/porkbun_secrets.py":/app/porkbun_secrets.py:ro \
+          -e CHECK_INTERVAL="{{ check_interval }}" \
+          -e LAST_IP_FILE="{{ last_ip_file }}" \
+          -e IP_SOURCE="{{ ip_source }}" \
+          "{{ image_name }}"
+      args:
+        executable: /bin/bash
+
+  handlers:
+    - name: restart container
+      shell: docker restart "{{ container_name }}" || true

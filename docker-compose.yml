@@ -1,0 +1,26 @@
+version: "3.8"
+services:
+  ddwatcher:
+    build: .
+    image: ddns-txt-updater:latest
+    container_name: ddnsupdater
+    restart: unless-stopped
+    environment:
+      # preferred: set these here or rely on porkbun_secrets.py mount
+      - CHECK_INTERVAL=300
+      - LAST_IP_FILE=/data/last_ip
+      - IP_SOURCE=https://api.ipify.org
+      # optionally set domain/subdomain directly here instead of using porkbun_secrets.py
+      # - PORKBUN_DOMAIN=example.com
+      # - PORKBUN_SUBDOMAIN=__ddnsinfo
+    volumes:
+      - ./data:/data
+      # mount your local, gitignored secrets file (create porkbun_secrets.py from template)
+      - ./porkbun_secrets.py:/app/porkbun_secrets.py:ro
+    tty: true
+    stdin_open: true
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request,sys; urllib.request.urlopen(\"https://api.ipify.org\", timeout=5) or sys.exit(0)'"]
+      interval: 5m
+      timeout: 10s
+      retries: 3
